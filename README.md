@@ -9,17 +9,22 @@ GET /api/public/card?game=<slug>&size=<size>&date=YYYY-MM-DD
 
 ## How it decides what to post
 
-- **Which game**: rotates through all 9 slugs (`film, tv, anagram, timeline,
-  poster, logline, boxoffice, faceoff, reviews`) one per day, deterministically
-  by date — no state needed. Override with the `GAME_ROTATION` repo variable
-  (comma-separated slugs) to feature a subset or a fixed order.
+- **All 9 games get posted every day**, spread across ~7am-9pm AEST rather
+  than bunched into one post — each of 9 scheduled trigger times in
+  `.github/workflows/daily-post.yml` is pinned to a specific game (see
+  the `case` mapping in the "Determine which game to post" step). Every
+  post still shows **yesterday's** answer, since the card API only
+  serves past dates.
+- **Manual runs**: trigger from the Actions tab with `workflow_dispatch`
+  and pick a specific game from the dropdown, or leave it blank to fall
+  back to date-based rotation (one game per day, useful for testing).
 - **Which size**: each platform gets a sensible default — `landscape` for
   Bluesky and X, `portrait` for Threads (matches Instagram/Threads' 4:5 feed
   format). Override per-platform with `BLUESKY_CARD_SIZE`, `X_CARD_SIZE`,
   `THREADS_CARD_SIZE`.
-- **Caption**: auto-generated ("New puzzle: Screentest {Game} is up") +
-  link + hashtags. Edit `buildCaption()` in `src/cardImage.js` to change
-  the wording.
+- **Caption**: auto-generated ("Yesterday's Screentest {Game} puzzle,
+  solved" + link + hashtags). Edit `buildCaption()` in `src/cardImage.js`
+  to change the wording.
 
 ## The SVG -> PNG problem, and how this handles it
 
@@ -102,3 +107,9 @@ Trigger a manual run anytime from the repo's Actions tab.
 - `story` size (1080x1920) is fetched by the API but not wired into any
   platform here — Stories posting generally isn't automatable via public
   APIs, so that size is best used manually via your `/cards` admin page.
+- **Cost/growth at 9 posts/day**: X's per-post pricing means ~9 posts/day
+  adds up — the bot already omits the link on X by default to keep this
+  down (~$4/month vs ~$54/month with links included on every post). The
+  `public-cards/` folder used for Threads also grows 9x faster now (9
+  PNGs/day) — worth pruning periodically or moving to a dedicated branch
+  if the repo gets large.

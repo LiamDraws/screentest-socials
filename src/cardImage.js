@@ -34,8 +34,17 @@ function dayIndexForDate(dateString) {
   return epochDays % config.gameRotation.length;
 }
 
-/** Picks the featured game for a given puzzle date (defaults to yesterday, the reveal date). */
+/**
+ * Picks the featured game for this run. If GAME_SLUG is set (used by the
+ * multi-slot daily schedule, where each of the day's 9 runs is pinned to
+ * a specific game), that wins. Otherwise falls back to date-based
+ * rotation — useful for manual/dry runs where no slot is specified.
+ */
 export function getFeaturedGame(dateString = yesterdayAest()) {
+  if (config.forcedGameSlug) {
+    const slug = config.forcedGameSlug;
+    return { slug, name: GAME_NAMES[slug] || slug };
+  }
   const slug = config.gameRotation[dayIndexForDate(dateString)];
   return { slug, name: GAME_NAMES[slug] || slug };
 }

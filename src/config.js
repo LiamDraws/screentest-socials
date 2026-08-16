@@ -2,6 +2,8 @@
 // sensitive ever lives in the repo. In GitHub Actions these come from
 // repository Secrets/Variables (Settings -> Secrets and variables -> Actions).
 
+// All slugs the API actually accepts (kept for validating GAME_SLUG env
+// var overrides, e.g. if you want to manually test a beta game).
 const ALL_GAME_SLUGS = [
   "film",
   "tv",
@@ -13,6 +15,11 @@ const ALL_GAME_SLUGS = [
   "faceoff",
   "reviews",
 ];
+
+// Games currently live for auto-posting. `logline` (formerly "Redacted")
+// and `reviews` are excluded while in beta — add them back here once
+// they're out of beta.
+const ACTIVE_GAME_SLUGS = ["film", "tv", "anagram", "timeline", "poster", "boxoffice", "faceoff"];
 
 // Human-readable names for captions.
 export const GAME_NAMES = {
@@ -27,16 +34,23 @@ export const GAME_NAMES = {
   reviews: "Reviews",
 };
 
+export const ALL_GAME_SLUGS_EXPORT = ALL_GAME_SLUGS;
+
 export const config = {
   siteBaseUrl: process.env.SCREENTEST_SITE_URL || "https://www.screentest.au",
 
-  // Order games rotate through, one per day, so every game gets featured
-  // roughly equally. Override with a comma-separated list, e.g.
-  // GAME_ROTATION="film,tv,anagram" to only ever feature a subset.
+  // Order games rotate through when no specific game is forced (see
+  // GAME_SLUG below) — used as a fallback for manual/dry runs. Defaults
+  // to active (non-beta) games only.
   gameRotation: (process.env.GAME_ROTATION
     ? process.env.GAME_ROTATION.split(",").map((s) => s.trim())
-    : ALL_GAME_SLUGS
+    : ACTIVE_GAME_SLUGS
   ).filter((slug) => ALL_GAME_SLUGS.includes(slug)),
+
+  // When set, this run posts exactly this game instead of picking one via
+  // rotation — used by the multi-slot daily schedule, where each of the
+  // day's 9 scheduled runs is pinned to a specific game (see workflow).
+  forcedGameSlug: ALL_GAME_SLUGS.includes(process.env.GAME_SLUG) ? process.env.GAME_SLUG : null,
 
   // If true, prints what WOULD be posted instead of actually posting.
   // Run with `npm run post:dry-run` or set DRY_RUN=true.
