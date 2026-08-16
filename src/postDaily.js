@@ -1,13 +1,16 @@
 import { config } from "./config.js";
-import { getTodaysGame, todayString, getCardPng, buildCaption } from "./cardImage.js";
+import { getFeaturedGame, yesterdayAest, getCardPng, buildCaption } from "./cardImage.js";
 import { publishPngToRepo } from "./publishPng.js";
 import { postToBluesky } from "./platforms/bluesky.js";
 import { postToX } from "./platforms/x.js";
 import { postToThreads } from "./platforms/threads.js";
 
 async function main() {
-  const date = todayString();
-  const game = getTodaysGame();
+  // The card API only serves past dates (today's puzzle stays hidden
+  // until it's "yesterday", so it's never spoiled) — so the bot always
+  // posts a reveal of yesterday's puzzle, not a teaser of today's.
+  const date = yesterdayAest();
+  const game = getFeaturedGame(date);
 
   console.log(`Featured game for ${date}: ${game.name} (${game.slug})`);
 

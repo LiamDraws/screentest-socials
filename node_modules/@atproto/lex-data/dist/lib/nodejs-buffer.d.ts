@@ -1,0 +1,17 @@
+type Encoding = 'utf8' | 'base64' | 'base64url';
+interface NodeJSBuffer<TArrayBuffer extends ArrayBufferLike = ArrayBufferLike> extends Uint8Array<TArrayBuffer> {
+    byteLength: number;
+    toString(encoding?: Encoding): string;
+}
+interface NodeJSBufferConstructor {
+    new (input: string, encoding?: Encoding): NodeJSBuffer;
+    from(input: Uint8Array | ArrayBuffer | ArrayBufferView): NodeJSBuffer<ArrayBuffer>;
+    from(input: string, encoding?: Encoding): NodeJSBuffer<ArrayBuffer>;
+    from<TArrayBuffer extends ArrayBufferLike>(arrayBuffer: WithImplicitCoercion<TArrayBuffer>, byteOffset?: number, length?: number): Buffer<TArrayBuffer>;
+    concat(list: readonly Uint8Array[], totalLength?: number): NodeJSBuffer;
+    byteLength(input: string, encoding?: Encoding): number;
+    prototype: NodeJSBuffer;
+}
+export declare const NodeJSBuffer: NodeJSBufferConstructor | null;
+export {};
+//# sourceMappingURL=nodejs-buffer.d.ts.map

@@ -28,7 +28,7 @@ export const GAME_NAMES = {
 };
 
 export const config = {
-  siteBaseUrl: process.env.SCREENTEST_SITE_URL || "https://screentest.au",
+  siteBaseUrl: process.env.SCREENTEST_SITE_URL || "https://www.screentest.au",
 
   // Order games rotate through, one per day, so every game gets featured
   // roughly equally. Override with a comma-separated list, e.g.
