@@ -1,0 +1,20 @@
+{
+  "name": "screentest-social-bot",
+  "version": "1.0.0",
+  "description": "Daily automated poster for Screentest (screentest.au) — posts yesterday's answer + today's puzzle link to Bluesky, X, and Threads.",
+  "type": "module",
+  "main": "src/postDaily.js",
+  "scripts": {
+    "post": "node src/postDaily.js",
+    "post:dry-run": "DRY_RUN=true node src/postDaily.js"
+  },
+  "dependencies": {
+    "@atproto/api": "^0.13.35",
+    "sharp": "^0.33.5",
+    "twitter-api-v2": "^1.19.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

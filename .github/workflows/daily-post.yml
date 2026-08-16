@@ -1,0 +1,37 @@
+name: Daily Screentest Social Post
+
+on:
+  schedule:
+    # 13:00 UTC daily — adjust to whenever your puzzles flip over.
+    # Cron is always UTC regardless of your local timezone.
+    - cron: "0 13 * * *"
+  workflow_dispatch: {} # lets you trigger a manual run from the Actions tab
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # needed so the bot can commit each day's PNG card for Threads to hotlink
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Post daily update
+        run: npm run post
+        env:
+          SCREENTEST_SITE_URL: ${{ vars.SCREENTEST_SITE_URL }}
+          GAME_ROTATION: ${{ vars.GAME_ROTATION }}
+          BLUESKY_IDENTIFIER: ${{ secrets.BLUESKY_IDENTIFIER }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          X_APP_KEY: ${{ secrets.X_APP_KEY }}
+          X_APP_SECRET: ${{ secrets.X_APP_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
