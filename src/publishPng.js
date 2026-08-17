@@ -17,14 +17,22 @@ export function publishPngToRepo(buffer, relativePath) {
   mkdirSync(dirname(relativePath), { recursive: true });
   writeFileSync(relativePath, buffer);
 
-  const run = (cmd) => execSync(cmd, { stdio: "pipe" });
+  const run = (cmd) => execSync(cmd, { stdio: "pipe" }).toString();
 
   try {
     run(`git config user.name "screentest-social-bot"`);
     run(`git config user.email "actions@users.noreply.github.com"`);
     run(`git add "${relativePath}"`);
-    run(`git commit -m "Daily social card: ${relativePath}"`);
-    run(`git push`);
+
+    // If this exact file (same game/date/size) was already committed —
+    // e.g. from an earlier test run today — there's nothing new to
+    // commit. That's not an error: the file (and its public URL) already
+    // exist, so just skip straight to returning the URL.
+    const staged = run(`git diff --cached --name-only`).trim();
+    if (staged) {
+      run(`git commit -m "Daily social card: ${relativePath}"`);
+      run(`git push`);
+    }
   } catch (err) {
     throw new Error(
       `Failed to commit/push card image to repo — check the workflow has ` +
