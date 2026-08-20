@@ -17,10 +17,20 @@ GET /api/public/card?kind=answers&size=<size>&date=YYYY-MM-DD
   separate card per game. The bot fetches both the `cover` (spoiler-free,
   good as a lead image) and `answers` (the actual reveal) cards for
   **yesterday's** date, since the API only serves past answers.
-- **Posted as a 2-image sequence** — cover first, then answers — on every
-  platform. Bluesky and X post these as a native multi-image post.
-  Threads posts them as a genuine carousel (Meta's 3-step API: create an
-  item container per image, then a parent container, then publish).
+- **Posted differently per platform, to give people a real choice about
+  spoilers**:
+  - **Threads**: posts just the **answers card**, flagged with Threads'
+    native `is_spoiler_media` — the image shows blurred in the feed until
+    the reader taps to reveal it. (A cover+answers carousel was tried
+    first but hit a Threads permissions error; the single spoiler-tagged
+    image turned out to be both simpler and a better fit for "let people
+    choose to see it" anyway.)
+  - **Bluesky and X**: post both the **cover card** (spoiler-free) and
+    **answers card** as a 2-image post. Neither platform has a native
+    spoiler-blur API (Bluesky's self-labels only cover NSFW categories;
+    X's `possibly_sensitive` flag is the same story) — cover-then-answers
+    is the closest available approximation, requiring a swipe/tap to see
+    the second image rather than a true blur.
 - **Size**: one `CARD_SIZE` setting applies to all platforms (default
   `square`, matching what the site's own `/cards` admin preview uses).
   Override with the `CARD_SIZE` repo variable if you want a different

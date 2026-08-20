@@ -29,15 +29,13 @@ async function main() {
     return;
   }
 
-  // Threads needs public image URLs, not raw bytes — commit both PNGs
-  // into the repo so they get public raw.githubusercontent.com URLs.
-  let threadsImageUrls = [];
+  // Threads posts a single image (just the answers card, spoiler-tagged)
+  // rather than the cover+answers carousel — see platforms/threads.js for
+  // why. It still needs a public URL, so commit just that one PNG.
+  let threadsImageUrl = null;
   if (config.threads.enabled) {
-    const coverPath = `public-cards/${date}-cover-${config.cardSize}.png`;
     const answersPath = `public-cards/${date}-answers-${config.cardSize}.png`;
-    const coverUrl = publishPngToRepo(coverPng.buffer, coverPath);
-    const answersUrl = publishPngToRepo(answersPng.buffer, answersPath);
-    threadsImageUrls = [coverUrl, answersUrl];
+    threadsImageUrl = publishPngToRepo(answersPng.buffer, answersPath);
     // Give raw.githubusercontent.com's CDN a moment to catch up.
     await new Promise((r) => setTimeout(r, 5000));
   }
@@ -45,7 +43,7 @@ async function main() {
   const results = await Promise.allSettled([
     postToBluesky({ text: blueskyText, images: [coverPng, answersPng] }),
     postToX({ text: xText, images: [coverPng, answersPng] }),
-    postToThreads({ text: threadsText, imageUrls: threadsImageUrls }),
+    postToThreads({ text: threadsText, imageUrl: threadsImageUrl }),
   ]);
 
   const platforms = ["Bluesky", "X", "Threads"];
