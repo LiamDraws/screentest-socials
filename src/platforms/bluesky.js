@@ -1,7 +1,8 @@
 import { AtpAgent, RichText } from "@atproto/api";
 import { config } from "../config.js";
 
-export async function postToBluesky({ text, image }) {
+/** images: array of {buffer, contentType, alt} — cover card first, then answers card. */
+export async function postToBluesky({ text, images }) {
   if (!config.bluesky.enabled) return { skipped: true, reason: "disabled" };
   if (!config.bluesky.identifier || !config.bluesky.appPassword) {
     throw new Error("Missing BLUESKY_IDENTIFIER or BLUESKY_APP_PASSWORD env vars.");
@@ -23,16 +24,16 @@ export async function postToBluesky({ text, image }) {
     createdAt: new Date().toISOString(),
   };
 
-  if (image) {
-    const uploaded = await agent.uploadBlob(image.buffer, { encoding: image.contentType });
+  if (images?.length) {
+    const uploaded = await Promise.all(
+      images.map((img) => agent.uploadBlob(img.buffer, { encoding: img.contentType }))
+    );
     record.embed = {
       $type: "app.bsky.embed.images",
-      images: [
-        {
-          image: uploaded.data.blob,
-          alt: "Screentest daily puzzle share card",
-        },
-      ],
+      images: uploaded.map((u, i) => ({
+        image: u.data.blob,
+        alt: images[i].alt || "Screentest daily puzzle card",
+      })),
     };
   }
 

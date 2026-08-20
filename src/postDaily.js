@@ -1,56 +1,51 @@
 import { config } from "./config.js";
-import { getFeaturedGame, yesterdayAest, getCardPng, buildCaption } from "./cardImage.js";
+import { yesterdayAest, getCardPng, buildCaption } from "./cardImage.js";
 import { publishPngToRepo } from "./publishPng.js";
 import { postToBluesky } from "./platforms/bluesky.js";
 import { postToX } from "./platforms/x.js";
 import { postToThreads } from "./platforms/threads.js";
 
 async function main() {
-  // The card API only serves past dates (today's puzzle stays hidden
-  // until it's "yesterday", so it's never spoiled) — so the bot always
-  // posts a reveal of yesterday's puzzle, not a teaser of today's.
+  // The card API only serves past dates for answers (today's stays
+  // unspoiled) — the bot always posts yesterday's combined reveal.
   const date = yesterdayAest();
-  const game = getFeaturedGame(date);
+  console.log(`Posting combined answers for ${date}`);
 
-  console.log(`Featured game for ${date}: ${game.name} (${game.slug})`);
-
-  const [blueskyImage, xImage, threadsImage] = await Promise.all([
-    config.bluesky.enabled ? getCardPng({ slug: game.slug, size: config.bluesky.cardSize, date }) : null,
-    config.x.enabled ? getCardPng({ slug: game.slug, size: config.x.cardSize, date }) : null,
-    config.threads.enabled ? getCardPng({ slug: game.slug, size: config.threads.cardSize, date }) : null,
+  const [coverPng, answersPng] = await Promise.all([
+    getCardPng({ kind: "cover", size: config.cardSize, date }),
+    getCardPng({ kind: "answers", size: config.cardSize, date }),
   ]);
 
-  const blueskyText = buildCaption(game, { includeLink: true });
-  const xText = buildCaption(game, { includeLink: config.x.includeLink });
-  const threadsText = buildCaption(game, { includeLink: true });
+  const blueskyText = buildCaption({ includeLink: true });
+  const xText = buildCaption({ includeLink: config.x.includeLink });
+  const threadsText = buildCaption({ includeLink: true });
 
-  console.log("--- Bluesky/Threads caption ---\n" + blueskyText);
-  console.log("--- X caption ---\n" + xText);
+  console.log("--- Caption ---\n" + blueskyText);
 
   if (config.dryRun) {
     console.log("DRY RUN — not posting anywhere.");
-    console.log("Card URLs:", {
-      bluesky: blueskyImage?.sourceUrl,
-      x: xImage?.sourceUrl,
-      threads: threadsImage?.sourceUrl,
-    });
+    console.log("Cover URL:", coverPng.sourceUrl);
+    console.log("Answers URL:", answersPng.sourceUrl);
     return;
   }
 
-  // Threads needs a public PNG URL, not raw bytes and not SVG — commit
-  // today's converted PNG into the repo so it gets a stable public
-  // raw.githubusercontent.com URL, then give the CDN a moment to catch up.
-  let threadsImageUrl = null;
-  if (threadsImage) {
-    const relativePath = `public-cards/${date}-${game.slug}-${config.threads.cardSize}.png`;
-    threadsImageUrl = publishPngToRepo(threadsImage.buffer, relativePath);
+  // Threads needs public image URLs, not raw bytes — commit both PNGs
+  // into the repo so they get public raw.githubusercontent.com URLs.
+  let threadsImageUrls = [];
+  if (config.threads.enabled) {
+    const coverPath = `public-cards/${date}-cover-${config.cardSize}.png`;
+    const answersPath = `public-cards/${date}-answers-${config.cardSize}.png`;
+    const coverUrl = publishPngToRepo(coverPng.buffer, coverPath);
+    const answersUrl = publishPngToRepo(answersPng.buffer, answersPath);
+    threadsImageUrls = [coverUrl, answersUrl];
+    // Give raw.githubusercontent.com's CDN a moment to catch up.
     await new Promise((r) => setTimeout(r, 5000));
   }
 
   const results = await Promise.allSettled([
-    postToBluesky({ text: blueskyText, image: blueskyImage }),
-    postToX({ text: xText, image: xImage }),
-    postToThreads({ text: threadsText, imageUrl: threadsImageUrl }),
+    postToBluesky({ text: blueskyText, images: [coverPng, answersPng] }),
+    postToX({ text: xText, images: [coverPng, answersPng] }),
+    postToThreads({ text: threadsText, imageUrls: threadsImageUrls }),
   ]);
 
   const platforms = ["Bluesky", "X", "Threads"];

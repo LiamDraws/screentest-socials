@@ -1,7 +1,8 @@
 import { TwitterApi } from "twitter-api-v2";
 import { config } from "../config.js";
 
-export async function postToX({ text, image }) {
+/** images: array of {buffer, contentType} — cover card first, then answers card. */
+export async function postToX({ text, images }) {
   if (!config.x.enabled) return { skipped: true, reason: "disabled" };
   const { appKey, appSecret, accessToken, accessSecret } = config.x;
   if (!appKey || !appSecret || !accessToken || !accessSecret) {
@@ -17,9 +18,11 @@ export async function postToX({ text, image }) {
   const rw = client.readWrite;
 
   let mediaIds;
-  if (image) {
-    const mediaId = await rw.v1.uploadMedia(image.buffer, { mimeType: image.contentType });
-    mediaIds = [mediaId];
+  if (images?.length) {
+    // X allows up to 4 images per post.
+    mediaIds = await Promise.all(
+      images.slice(0, 4).map((img) => rw.v1.uploadMedia(img.buffer, { mimeType: img.contentType }))
+    );
   }
 
   // Note: X's pay-per-use pricing (2026) charges per post, and more if the

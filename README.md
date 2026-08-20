@@ -1,55 +1,56 @@
 # Screentest Social Bot
 
-Posts a daily branded puzzle card to Bluesky, X, and Threads automatically
-via GitHub Actions — built around your real card API:
+Posts once a day: a 2-image post (spoiler-free **cover card**, then the
+**combined answers card**) covering every puzzle from the previous day —
+including the locked/paywalled one — to Bluesky, X, and Threads.
 
 ```
-GET /api/public/card?game=<slug>&size=<size>&date=YYYY-MM-DD
+GET /api/public/card?kind=cover&size=<size>&date=YYYY-MM-DD
+GET /api/public/card?kind=answers&size=<size>&date=YYYY-MM-DD
 ```
 
-## How it decides what to post
+## How it works
 
-- **All 9 games get posted every day**, spread across ~7am-9pm AEST rather
-  than bunched into one post — each of 9 scheduled trigger times in
-  `.github/workflows/daily-post.yml` is pinned to a specific game (see
-  the `case` mapping in the "Determine which game to post" step). Every
-  post still shows **yesterday's** answer, since the card API only
-  serves past dates.
-- **Manual runs**: trigger from the Actions tab with `workflow_dispatch`
-  and pick a specific game from the dropdown, or leave it blank to fall
-  back to date-based rotation (one game per day, useful for testing).
-- **Which size**: each platform gets a sensible default — `landscape` for
-  Bluesky and X, `portrait` for Threads (matches Instagram/Threads' 4:5 feed
-  format). Override per-platform with `BLUESKY_CARD_SIZE`, `X_CARD_SIZE`,
-  `THREADS_CARD_SIZE`.
-- **Caption**: auto-generated ("Yesterday's Screentest {Game} puzzle,
-  solved" + link + hashtags). Edit `buildCaption()` in `src/cardImage.js`
-  to change the wording.
+- **One card per day, not per game.** The site now generates a single
+  combined card covering all of that day's puzzles (Film + whichever
+  other games were live, including the locked one), rather than a
+  separate card per game. The bot fetches both the `cover` (spoiler-free,
+  good as a lead image) and `answers` (the actual reveal) cards for
+  **yesterday's** date, since the API only serves past answers.
+- **Posted as a 2-image sequence** — cover first, then answers — on every
+  platform. Bluesky and X post these as a native multi-image post.
+  Threads posts them as a genuine carousel (Meta's 3-step API: create an
+  item container per image, then a parent container, then publish).
+- **Size**: one `CARD_SIZE` setting applies to all platforms (default
+  `square`, matching what the site's own `/cards` admin preview uses).
+  Override with the `CARD_SIZE` repo variable if you want a different
+  size (`portrait`, `story`, `landscape` should still work if the API
+  supports them).
+- **Caption**: generic across all games, since one post now covers
+  everything ("Yesterday's Screentest answers, revealed" + link +
+  hashtag). Edit `buildCaption()` in `src/cardImage.js` to change wording.
 
-## The SVG -> PNG problem, and how this handles it
+## The SVG -> PNG problem, and how this is handled
 
-Your API returns SVG. None of the three platforms accept SVG for image
-posts, so the bot converts to PNG locally (via `sharp`) before posting.
+The card API returns SVG. None of the three platforms accept SVG for
+image posts, so the bot converts both cards to PNG locally (via `sharp`)
+before posting.
 
 For **Bluesky and X**, that's enough — both accept uploaded image bytes
 directly.
 
-For **Threads**, Meta's Graph API requires a *public image URL* rather
-than uploaded bytes, and SVG isn't accepted either way. Since there's
-nowhere public to host the converted PNG, the bot **commits each day's
-PNG into this repo** (under `public-cards/`) and uses its
-`raw.githubusercontent.com` URL. No extra hosting account, but two
-things to know:
+For **Threads**, Meta's Graph API requires public image *URLs* (not
+uploaded bytes), and SVG isn't accepted either way. Since there's nowhere
+public to host the converted PNGs, the bot **commits both PNGs into this
+repo** (under `public-cards/`) each day and uses their
+`raw.githubusercontent.com` URLs. This requires the repo to be **public**
+(private repos block that URL from being fetched externally) and the
+workflow to run with `permissions: contents: write` (already set).
 
-- The workflow needs `permissions: contents: write` (already set) so it
-  can push these commits.
-- `public-cards/` will accumulate one file per day. Fine for a long
-  time, but you may want to periodically prune old ones, or later move
-  to a dedicated orphan branch if it gets unwieldy.
-
-**Better long-term fix**: if you ever add a `&format=png` option to your
-card API, swap the Threads image source to that URL directly and delete
-`src/publishPng.js` entirely — cleaner and avoids the repo growing.
+`public-cards/` grows by 2 files/day — worth pruning periodically, or
+moving to a dedicated branch if the repo gets large. **Better long-term
+fix**: if the card API ever adds public PNG output directly, point
+Threads at that URL instead and delete `src/publishPng.js` entirely.
 
 ## 1. Get API credentials per platform
 
@@ -59,44 +60,50 @@ card API, swap the Threads image source to that URL directly and delete
 
 **X (Twitter)**
 1. developer.x.com -> create a Project + App
-2. Generate API Key/Secret and Access Token/Secret (Read+Write permissions)
+2. Generate API Key/Secret and Access Token/Secret (Read+Write permissions,
+   generated AFTER setting that permission level or they'll be read-only)
 3. You need: `X_APP_KEY`, `X_APP_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET`
-4. Note: X's 2026 pay-per-use pricing charges extra if post text contains
-   a raw URL (~$0.20/post vs $0.015). The bot defaults to **omitting the
-   link on X** for this reason (image + bio carry it instead) — set
-   `X_INCLUDE_LINK=true` to include it anyway.
+4. X's 2026 pay-per-use pricing charges extra if post text contains a raw
+   URL — the bot omits the link on X by default (image + bio carry it);
+   set `X_INCLUDE_LINK=true` to include it anyway.
 
 **Threads**
 1. developers.facebook.com -> create an app -> add the Threads API product
-2. Link a Threads professional account, generate a long-lived access
-   token (Meta tokens expire — refresh roughly every 60 days)
-3. You need: `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN`
+2. Add yourself as a Threads Tester (Roles -> Threads Testers), approve
+   from the Threads app if prompted
+3. Use the app's built-in **User Token Generator** (under the Threads use
+   case settings) to get a token directly — usually simpler than the
+   manual OAuth redirect flow
+4. You need: `THREADS_USER_ID` (from a `/me` call), `THREADS_ACCESS_TOKEN`
 
 ## 2. Add secrets/variables to GitHub
 
 Repo -> Settings -> Secrets and variables -> Actions
 - Add each credential above as a **Secret**
-- Optionally add `SCREENTEST_SITE_URL` and `GAME_ROTATION` as **Variables**
-  (not secret — just config, defaults are fine if you skip this)
+- Optionally add `SCREENTEST_SITE_URL` and `CARD_SIZE` as **Variables**
+  (defaults are fine if you skip this)
+- Make sure the repo itself is **public** (Settings -> Danger Zone ->
+  Change visibility) — required for the Threads image-hosting trick above
 
 ## 3. Test locally before trusting the schedule
 
 ```bash
 npm install
 cp .env.example .env   # fill in real values
-npm run post:dry-run   # prints what would be posted + card URLs, posts nothing
-npm run post           # actually posts (also commits a card PNG for Threads)
+npm run post:dry-run   # prints the caption + both card URLs, posts nothing
+npm run post           # actually posts (also commits 2 PNGs for Threads)
 ```
 
 Note: the repo-commit step for Threads only works inside GitHub Actions
-(it needs `GITHUB_REPOSITORY`/git push access) — a local dry run will
-show you the caption and card size but won't exercise that step.
+(needs `GITHUB_REPOSITORY`/git push access) — a local dry run won't
+exercise that step.
 
 ## 4. Turn it on
 
-Push to your repo with secrets configured — `.github/workflows/daily-post.yml`
-runs daily at 13:00 UTC (adjust the cron to match when puzzles flip over).
-Trigger a manual run anytime from the repo's Actions tab.
+Push to the repo with secrets configured — the workflow runs daily at
+07:00 AEST (21:00 UTC) by default. Trigger a manual run anytime from the
+Actions tab (no inputs needed now — always posts yesterday's combined
+answers).
 
 ## Notes
 
@@ -104,12 +111,6 @@ Trigger a manual run anytime from the repo's Actions tab.
   post — failures don't block each other.
 - Threads tokens expire periodically; if posts silently stop after a
   couple months, check that first.
-- `story` size (1080x1920) is fetched by the API but not wired into any
-  platform here — Stories posting generally isn't automatable via public
-  APIs, so that size is best used manually via your `/cards` admin page.
-- **Cost/growth at 9 posts/day**: X's per-post pricing means ~9 posts/day
-  adds up — the bot already omits the link on X by default to keep this
-  down (~$4/month vs ~$54/month with links included on every post). The
-  `public-cards/` folder used for Threads also grows 9x faster now (9
-  PNGs/day) — worth pruning periodically or moving to a dedicated branch
-  if the repo gets large.
+- If a game+date combo was already committed to `public-cards/` from an
+  earlier test run today, the bot detects there's nothing new to commit
+  and just reuses the existing public URL instead of erroring.

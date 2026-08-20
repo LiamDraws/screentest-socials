@@ -1,44 +1,20 @@
 name: Screentest Social Posts
 
-# Posts each active game's answer once a day, spread across AEST waking
-# hours (~7am-9pm) rather than bunched into one post — each cron time
-# below is pinned to one specific game via the mapping step. Times are
-# UTC (cron is always UTC); comments show the equivalent
-# Australia/Brisbane time (fixed UTC+10, no DST — adjust every entry by
-# an hour if the site actually runs on a DST-observing zone like Sydney).
-#
-# logline (Redacted) and reviews are excluded while in beta — add cron
-# entries + mapping cases for them once they're live.
+# Posts once a day: a 2-image post (spoiler-free cover card, then the
+# combined answers card) covering ALL of yesterday's puzzles at once,
+# including the locked/paywalled one. Time is UTC (cron is always UTC);
+# 21:00 UTC = 07:00 Australia/Brisbane (fixed UTC+10, no DST — adjust if
+# the site actually runs on a DST-observing zone like Sydney).
 on:
   schedule:
-    - cron: "0 21 * * *"  # 07:00 AEST -> film
-    - cron: "20 22 * * *" # 08:20 AEST -> tv
-    - cron: "40 23 * * *" # 09:40 AEST -> anagram
-    - cron: "0 1 * * *"   # 11:00 AEST -> timeline
-    - cron: "20 2 * * *"  # 12:20 AEST -> poster
-    - cron: "40 3 * * *"  # 13:40 AEST -> boxoffice
-    - cron: "0 5 * * *"   # 15:00 AEST -> faceoff
-  workflow_dispatch:
-    inputs:
-      game:
-        description: "Game to post (leave blank to use date-based rotation)"
-        required: false
-        type: choice
-        options:
-          - ""
-          - film
-          - tv
-          - anagram
-          - timeline
-          - poster
-          - boxoffice
-          - faceoff
+    - cron: "0 21 * * *" # 07:00 AEST
+  workflow_dispatch: {} # manual trigger from the Actions tab, no inputs needed
 
 jobs:
   post:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # needed so the bot can commit each PNG card for Threads to hotlink
+      contents: write # needed so the bot can commit each day's PNG cards for Threads to hotlink
     steps:
       - uses: actions/checkout@v4
 
@@ -49,32 +25,11 @@ jobs:
 
       - run: npm ci
 
-      # Maps each scheduled trigger time to a specific game. Manual runs
-      # use whatever was picked in the workflow_dispatch dropdown instead
-      # (or fall back to date-based rotation if left blank).
-      - name: Determine which game to post
-        run: |
-          if [ -n "${{ github.event.inputs.game }}" ]; then
-            echo "GAME_SLUG=${{ github.event.inputs.game }}" >> "$GITHUB_ENV"
-          else
-            case "${{ github.event.schedule }}" in
-              "0 21 * * *")  echo "GAME_SLUG=film" >> "$GITHUB_ENV" ;;
-              "20 22 * * *") echo "GAME_SLUG=tv" >> "$GITHUB_ENV" ;;
-              "40 23 * * *") echo "GAME_SLUG=anagram" >> "$GITHUB_ENV" ;;
-              "0 1 * * *")   echo "GAME_SLUG=timeline" >> "$GITHUB_ENV" ;;
-              "20 2 * * *")  echo "GAME_SLUG=poster" >> "$GITHUB_ENV" ;;
-              "40 3 * * *")  echo "GAME_SLUG=boxoffice" >> "$GITHUB_ENV" ;;
-              "0 5 * * *")   echo "GAME_SLUG=faceoff" >> "$GITHUB_ENV" ;;
-              *) echo "No schedule match and no manual game chosen — falling back to date rotation." ;;
-            esac
-          fi
-
       - name: Post to socials
         run: npm run post
         env:
-          GAME_SLUG: ${{ env.GAME_SLUG }}
           SCREENTEST_SITE_URL: ${{ vars.SCREENTEST_SITE_URL }}
-          GAME_ROTATION: ${{ vars.GAME_ROTATION }}
+          CARD_SIZE: ${{ vars.CARD_SIZE }}
           BLUESKY_ENABLED: ${{ vars.BLUESKY_ENABLED }}
           X_ENABLED: ${{ vars.X_ENABLED }}
           THREADS_ENABLED: ${{ vars.THREADS_ENABLED }}
